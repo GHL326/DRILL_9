@@ -1,36 +1,43 @@
-from pico2d import *
+"""자동 달리기 예제: 오른쪽 경계에서 IDLE, ESC로 종료."""
 
-open_canvas()
-grass = load_image('grass.png')
-character = load_image('animation_sheet.png')
+import pico2d as pico
 
-
-running = True
+from move_character import ASSET_DIR, FRAME_SIZE, HEIGHT, WIDTH, Character
 
 
-def handle_events():
-    global running
+def main():
+    pico.open_canvas(WIDTH, HEIGHT)
+    background = sheet = None
+    try:
+        background = pico.load_image(str(ASSET_DIR / "TUK_GROUND.png"))
+        sheet = pico.load_image(str(ASSET_DIR / "animation_sheet.png"))
+        character = Character()
+        character.x = FRAME_SIZE / 2
+        last_time = pico.get_time()
+        running = True
 
-    events = get_events()
-    for event in events:
-        if event.type == SDL_QUIT:
-            running = False
-        elif event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
-            running = False
+        while running:
+            for event in pico.get_events():
+                if event.type == pico.SDL_QUIT:
+                    running = False
+                elif event.type == pico.SDL_KEYDOWN and event.key == pico.SDLK_ESCAPE:
+                    running = False
+            if not running:
+                break
 
-frame = 0
-for x in range(0, 800, 5):
-    handle_events()
-    if not running:
-        break
+            now = pico.get_time()
+            dt = min(max(now - last_time, 0.0), 0.1)
+            last_time = now
+            character.update(dt, 1, 0)
+            pico.clear_canvas()
+            background.draw(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT)
+            character.draw(sheet)
+            pico.update_canvas()
+            pico.delay(0.01)
+    finally:
+        sheet = background = None
+        pico.close_canvas()
 
-    clear_canvas()
-    grass.draw(400, 30)
-    character.clip_draw(frame * 100, 100, 100, 100, x, 90)
-    update_canvas()
 
-    frame = (frame + 1) % 8
-    delay(0.05)
-
-
-close_canvas()
+if __name__ == "__main__":
+    main()

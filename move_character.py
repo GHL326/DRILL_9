@@ -1,4 +1,4 @@
-"""방향키로 상하좌우 이동하는 Drill 09 키보드 예제."""
+"""Drill 09 제출용: 상하좌우 이동, 방향 유지, RUN/IDLE, 화면 경계."""
 
 from pathlib import Path
 
