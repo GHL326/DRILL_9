@@ -1,14 +1,14 @@
-﻿from pathlib import Path
+from pathlib import Path
 from pico2d import *
 
 
-WIDTH, HEIGHT = 800, 600
+WIDTH, HEIGHT = 1000, 800
 RUN_LEFT, RUN_RIGHT = 0, 1
 IDLE_LEFT, IDLE_RIGHT = 2, 3
 ASSET_DIR = Path(__file__).resolve().parent
 
 open_canvas(WIDTH, HEIGHT)
-grass = load_image(str(ASSET_DIR / 'grass.png'))
+background = load_image(str(ASSET_DIR / 'TUK_GROUND.png'))
 character = load_image(str(ASSET_DIR / 'animation_sheet.png'))
 
 running = True
@@ -55,8 +55,8 @@ try:
         action = next_action
 
         clear_canvas()
-        grass.draw(WIDTH // 2, 30)
-        character.clip_draw(frame * 100, action * 100, 100, 100, x, 90)
+        background.draw(WIDTH // 2, HEIGHT // 2, WIDTH, HEIGHT)
+        character.clip_draw(frame * 100, action * 100, 100, 100, x, HEIGHT // 2)
         update_canvas()
         frame = (frame + 1) % 8
         delay(0.05)
