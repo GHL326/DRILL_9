@@ -1,64 +1,112 @@
+"""방향키로 상하좌우 이동하는 Drill 09 키보드 예제."""
+
 from pathlib import Path
-from pico2d import *
+
+import pico2d as pico
 
 
 WIDTH, HEIGHT = 1000, 800
+FRAME_SIZE = 100
+FRAME_COUNT = 8
+ANIMATION_FPS = 20
+MOVE_SPEED = 100
 RUN_LEFT, RUN_RIGHT = 0, 1
 IDLE_LEFT, IDLE_RIGHT = 2, 3
 ASSET_DIR = Path(__file__).resolve().parent
-
-open_canvas(WIDTH, HEIGHT)
-background = load_image(str(ASSET_DIR / 'TUK_GROUND.png'))
-character = load_image(str(ASSET_DIR / 'animation_sheet.png'))
-
-running = True
-x = WIDTH // 2
-frame = 0
-direction = 0
-facing = 1
-action = IDLE_RIGHT
-pressed_keys = set()
+DIRECTIONS = {
+    pico.SDLK_LEFT: (-1, 0),
+    pico.SDLK_RIGHT: (1, 0),
+    pico.SDLK_UP: (0, 1),
+    pico.SDLK_DOWN: (0, -1),
+}
 
 
-def handle_events():
-    global running, direction
+class Character:
+    def __init__(self):
+        self.x = WIDTH / 2
+        self.y = HEIGHT / 2
+        self.facing = 1
+        self.action = IDLE_RIGHT
+        self.animation_time = 0.0
 
-    for event in get_events():
-        key = getattr(event, 'key', None)
-        if event.type == SDL_QUIT:
-            running = False
-        elif event.type == SDL_KEYDOWN:
-            if key == SDLK_ESCAPE:
-                running = False
-            elif key in (SDLK_LEFT, SDLK_RIGHT):
-                pressed_keys.add(key)
-        elif event.type == SDL_KEYUP:
-            pressed_keys.discard(key)
+    @property
+    def frame(self):
+        return int(self.animation_time * ANIMATION_FPS + 1e-9) % FRAME_COUNT
 
-    direction = int(SDLK_RIGHT in pressed_keys) - int(SDLK_LEFT in pressed_keys)
+    def update(self, dt, dx, dy):
+        old_x, old_y = self.x, self.y
+        half = FRAME_SIZE / 2
+        self.x = pico.clamp(half, self.x + dx * MOVE_SPEED * dt, WIDTH - half)
+        self.y = pico.clamp(half, self.y + dy * MOVE_SPEED * dt, HEIGHT - half)
 
-
-try:
-    while running:
-        handle_events()
-        if not running:
-            break
-
-        x = clamp(50, x + direction * 5, WIDTH - 50)
-        if direction:
-            facing = direction
-            next_action = RUN_RIGHT if direction > 0 else RUN_LEFT
+        # 세로 이동은 마지막 좌우 시선을 유지한다.
+        if dx:
+            self.facing = dx
+        moving = self.x != old_x or self.y != old_y
+        if moving:
+            next_action = RUN_RIGHT if self.facing > 0 else RUN_LEFT
         else:
-            next_action = IDLE_RIGHT if facing > 0 else IDLE_LEFT
-        if next_action != action:
-            frame = 0
-        action = next_action
+            next_action = IDLE_RIGHT if self.facing > 0 else IDLE_LEFT
 
-        clear_canvas()
-        background.draw(WIDTH // 2, HEIGHT // 2, WIDTH, HEIGHT)
-        character.clip_draw(frame * 100, action * 100, 100, 100, x, HEIGHT // 2)
-        update_canvas()
-        frame = (frame + 1) % 8
-        delay(0.05)
-finally:
-    close_canvas()
+        if next_action != self.action:
+            self.action = next_action
+            self.animation_time = 0.0
+        else:
+            self.animation_time = (
+                self.animation_time + dt
+            ) % (FRAME_COUNT / ANIMATION_FPS)
+
+    def draw(self, sheet):
+        sheet.clip_draw(
+            self.frame * FRAME_SIZE, self.action * FRAME_SIZE,
+            FRAME_SIZE, FRAME_SIZE, self.x, self.y,
+        )
+
+
+def handle_events(pressed_keys):
+    """누른 순서를 보존하고 ESC 또는 창 닫기는 False를 반환한다."""
+    for event in pico.get_events():
+        key = getattr(event, "key", None)
+        if event.type == pico.SDL_QUIT:
+            return False
+        if event.type == pico.SDL_KEYDOWN:
+            if key == pico.SDLK_ESCAPE:
+                return False
+            if key in DIRECTIONS and key not in pressed_keys:
+                pressed_keys.append(key)
+        elif event.type == pico.SDL_KEYUP and key in pressed_keys:
+            pressed_keys.remove(key)
+    return True
+
+
+def main():
+    pico.open_canvas(WIDTH, HEIGHT)
+    background = sheet = None
+    try:
+        background = pico.load_image(str(ASSET_DIR / "TUK_GROUND.png"))
+        sheet = pico.load_image(str(ASSET_DIR / "animation_sheet.png"))
+        character = Character()
+        pressed_keys = []
+        last_time = pico.get_time()
+
+        while handle_events(pressed_keys):
+            now = pico.get_time()
+            # 창 이동 등으로 지연되어도 한 번에 크게 뛰지 않도록 제한한다.
+            dt = min(max(now - last_time, 0.0), 0.1)
+            last_time = now
+            dx, dy = DIRECTIONS[pressed_keys[-1]] if pressed_keys else (0, 0)
+            character.update(dt, dx, dy)
+
+            pico.clear_canvas()
+            background.draw(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT)
+            character.draw(sheet)
+            pico.update_canvas()
+            pico.delay(0.01)
+    finally:
+        # 텍스처를 먼저 해제한 뒤 캔버스를 닫는다.
+        sheet = background = None
+        pico.close_canvas()
+
+
+if __name__ == "__main__":
+    main()
